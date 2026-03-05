@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente Académico - Alumno</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script>
+    window.MathJax = {
+        tex: { inlineMath: [['\\(', '\\)']], displayMath: [['$$', '$$']] }
+    };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <style>
+        /* Estilo para que el scroll del chat sea suave */
+        #chatBox { scroll-behavior: smooth; }
+        /* Mejorar legibilidad de Markdown */
+        .prose p { margin-bottom: 1rem; }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen flex overflow-hidden">
+
+<aside id="sidebar"
+    class="fixed md:static inset-y-0 left-0 z-40
+           w-64 bg-gray-950 border-r border-gray-800
+           p-4 flex flex-col
+           transform -translate-x-full md:translate-x-0
+           transition-transform duration-300">
+
+    <h2 class="text-lg font-semibold mb-4">Materias</h2>
+
+    <button onclick="nuevaConversacion()"
+            class="bg-green-600 hover:bg-green-700
+                   px-4 py-2 rounded-lg mb-4 text-left w-full font-medium transition">
+        + Nueva conversación
+    </button>
+
+    <div id="sidebarMaterias" class="flex-1 overflow-y-auto space-y-2 text-gray-400 text-sm">
+        </div>
+</aside>
+
+<div id="overlay"
+     onclick="toggleSidebar()"
+     class="fixed inset-0 bg-black bg-opacity-50 hidden z-30 md:hidden">
+</div>
+
+<main class="flex-1 flex flex-col h-screen">
+
+    <header class="border-b border-gray-800 p-4 text-lg font-semibold bg-gray-950 flex items-center justify-between">
+        <div class="flex items-center">
+            <button onclick="toggleSidebar()" class="md:hidden mr-3 text-xl text-gray-400">☰</button>
+            Chat Académico
+        </div>
+        <span id="statusIndicator" class="text-xs text-green-500 font-normal">● En línea</span>
+    </header>
+
+    <div id="chatBox" class="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-900">
+        <div class="text-gray-500 text-center mt-10">
+            <p class="text-xl">👋 ¡Hola!</p>
+            <p>Selecciona una materia a la izquierda y escribe tu consulta.</p>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-800 p-4 bg-gray-950 space-y-3">
+        
+        <input type="password"
+            id="codigoAcceso"
+            placeholder="Código de acceso de la clase"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:outline-none focus:border-green-500 transition">
+
+        <div class="flex gap-3">
+            <input type="text"
+                id="preguntaAlumno"
+                onkeypress="if(event.key === 'Enter') preguntarIA()"
+                placeholder="Escribe tu pregunta aquí..."
+                class="flex-1 bg-gray-800 border border-gray-700 rounded-lg p-3 focus:outline-none focus:border-green-500 transition">
+
+            <button onclick="preguntarIA()"
+                id="btnEnviar"
+                class="bg-green-600 hover:bg-green-700 px-6 rounded-lg font-bold transition disabled:opacity-50">
+                Enviar
+            </button>
+        </div>
+    </div>
+
+</main>
+
+<script>
+/** * CONFIGURACIÓN CRUCIAL:
+ * Si el frontend y backend están unificados, dejamos la URL vacía.
+ * El navegador usará automáticamente la URL de Render/Vercel.
+ */
+const API_URL = window.location.origin; 
+window.materiaSeleccionada = null;
+
+function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("overlay");
+    sidebar.classList.toggle("-translate-x-full");
+    overlay.classList.toggle("hidden");
+}
+
+function nuevaConversacion() {
+    document.getElementById("chatBox").innerHTML =
+        `<div class="text-gray-500 text-center mt-10">Nueva conversación iniciada…</div>`;
+}
+
+function seleccionarMateria(id, element) {
+    window.materiaSeleccionada = id;
+    document.querySelectorAll("#sidebarMaterias div")
+        .forEach(i => i.classList.remove("bg-gray-800", "text-white", "border-l-4", "border-green-500"));
+
+    element.classList.add("bg-gray-800", "text-white", "border-l-4", "border-green-500");
+}
+
+async function cargarMaterias() {
+    try {
+        const res = await fetch(`${API_URL}/api/materias`); // Ajustado a la ruta estándar /api
+        if (!res.ok) throw new Error("No se pudo obtener las materias");
+        const materias = await res.json();
+
+        const sidebar = document.getElementById("sidebarMaterias");
+        sidebar.innerHTML = "";
+
+        materias.forEach(m => {
+            const div = document.createElement("div");
+            // Usamos 'm.id' o 'm.materiaId' según tu base de datos SQLite
+            const nombreMateria = m.id || m.materiaId || "Materia sin nombre";
+            div.textContent = nombreMateria;
+            div.className = "cursor-pointer p-3 rounded hover:bg-gray-800 transition duration-200 mb-1";
+            div.onclick = (e) => seleccionarMateria(nombreMateria, div);
+            sidebar.appendChild(div);
+        });
+
+    } catch (err) {
+        console.error("Error cargando materias", err);
+        document.getElementById("sidebarMaterias").innerHTML = "<p class='text-red-500 px-2'>Error al conectar con el servidor.</p>";
+    }
+}
+
+async function preguntarIA() {
+    const inputPregunta = document.getElementById('preguntaAlumno');
+    const pregunta = inputPregunta.value.trim();
+    const codigoAcceso = document.getElementById('codigoAcceso').value.trim();
+    const materiaId = window.materiaSeleccionada;
+    const chatBox = document.getElementById('chatBox');
+    const btnEnviar = document.getElementById('btnEnviar');
+
+    if (!pregunta || !codigoAcceso || !materiaId) {
+        alert("Por favor: Selecciona una materia, ingresa el código y tu pregunta.");
+        return;
+    }
+
+    // Bloquear UI mientras carga
+    btnEnviar.disabled = true;
+    inputPregunta.value = "Pensando...";
+
+    // Agregar pregunta del alumno al chat
+    chatBox.innerHTML += `
+        <div class="flex justify-end animate-fade-in">
+            <div class="bg-green-700 p-4 rounded-2xl rounded-tr-none max-w-[80%] shadow-lg">
+                ${pregunta}
+            </div>
+        </div>
+    `;
+    
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    try {
+        const res = await fetch(`${API_URL}/api/alumno/preguntar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pregunta, codigoAcceso, materiaId })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            alert(data.respuesta || "Error en la consulta");
+            return;
+        }
+        // Convertir Markdown a HTML
+        const respuestaHTML = marked.parse(data.respuesta || "Lo siento, no pude procesar esa respuesta.");
+
+        chatBox.innerHTML += `
+            <div class="flex justify-start animate-fade-in">
+                <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-none max-w-[80%] shadow-lg prose prose-invert">
+                    ${respuestaHTML}
+                </div>
+            </div>
+        `;
+
+        // Renderizar fórmulas matemáticas si las hay
+        if (window.MathJax) MathJax.typesetPromise();
+
+    } catch (err) {
+        chatBox.innerHTML += `<div class="text-red-400 text-center">❌ Error de conexión con el asistente.</div>`;
+    } finally {
+        btnEnviar.disabled = false;
+        inputPregunta.value = "";
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+}
+
+// Iniciar carga
+cargarMaterias();
+</script>
+
+</body>
+</html>
