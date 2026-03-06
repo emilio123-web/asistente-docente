@@ -56,7 +56,7 @@ let db;
 // --- CONFIGURACIÓN DE IA ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash", // Corregido a versión estable
+    model: "gemini-2.5-flash", // Corregido a versión estable
     systemInstruction: `Eres un Asistente Docente Virtual empático y pedagógico.
     REGLAS: 1. Usa el MATERIAL DE CÁTEDRA. 2. Usa ejemplos y analogías. 3. Verifica fechas.`
 });
