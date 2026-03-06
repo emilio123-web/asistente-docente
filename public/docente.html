@@ -82,7 +82,7 @@ async function subirMaterial() {
     mensaje.innerText = "Guardando materia...";
 
     try {
-        const res = await fetch(`${API_URL}/docente/subir-material`, {
+        const res = await fetch(`${API_URL}/api/docente/subir-material`, {
             method: 'POST',
             body: formData
         });
@@ -100,7 +100,7 @@ async function cargarMaterias() {
     const lista = document.getElementById('listaMaterias');
 
     try {
-        const res = await fetch(`${API_URL}/materias`);
+        const res = await fetch(`${API_URL}/api/materias`);
         const materias = await res.json();
 
         lista.innerHTML = "";
