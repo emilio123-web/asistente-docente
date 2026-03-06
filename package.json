@@ -13,11 +13,12 @@
   "dependencies": {
     "@google/genai": "^1.43.0",
     "@google/generative-ai": "^0.24.1",
-    "@supabase/supabase-js": "^2.97.0",
+    "@supabase/supabase-js": "^2.98.0",
     "axios": "^1.13.6",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "express-fileupload": "^1.5.2",
     "express-rate-limit": "^8.3.0",
     "form-data": "^4.0.5",
     "multer": "^2.1.1",

@@ -15,10 +15,10 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     <style>
-        /* Estilo para que el scroll del chat sea suave */
         #chatBox { scroll-behavior: smooth; }
-        /* Mejorar legibilidad de Markdown */
         .prose p { margin-bottom: 1rem; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 
@@ -26,75 +26,88 @@
 
 <aside id="sidebar"
     class="fixed md:static inset-y-0 left-0 z-40
-           w-64 bg-gray-950 border-r border-gray-800
+           w-72 bg-gray-950 border-r border-gray-800
            p-4 flex flex-col
            transform -translate-x-full md:translate-x-0
            transition-transform duration-300">
 
-    <h2 class="text-lg font-semibold mb-4">Materias</h2>
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold text-green-500">Materias</h2>
+        <button onclick="toggleSidebar()" class="md:hidden text-gray-400">✕</button>
+    </div>
 
     <button onclick="nuevaConversacion()"
-            class="bg-green-600 hover:bg-green-700
-                   px-4 py-2 rounded-lg mb-4 text-left w-full font-medium transition">
-        + Nueva conversación
+            class="bg-gray-800 hover:bg-gray-700 border border-gray-700
+                   px-4 py-3 rounded-xl mb-6 text-left w-full font-medium transition flex items-center gap-2">
+        <span>+</span> Nueva conversación
     </button>
 
-    <div id="sidebarMaterias" class="flex-1 overflow-y-auto space-y-2 text-gray-400 text-sm">
-        </div>
+    <div id="sidebarMaterias" class="flex-1 overflow-y-auto space-y-2">
+        <p class="text-gray-600 text-sm animate-pulse">Cargando cátedras...</p>
+    </div>
+
+    <div class="pt-4 border-t border-gray-800 text-xs text-gray-500">
+        Conectado a la Red Académica
+    </div>
 </aside>
 
-<div id="overlay"
-     onclick="toggleSidebar()"
-     class="fixed inset-0 bg-black bg-opacity-50 hidden z-30 md:hidden">
-</div>
+<div id="overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-60 hidden z-30 md:hidden"></div>
 
-<main class="flex-1 flex flex-col h-screen">
+<main class="flex-1 flex flex-col h-screen relative">
 
-    <header class="border-b border-gray-800 p-4 text-lg font-semibold bg-gray-950 flex items-center justify-between">
-        <div class="flex items-center">
-            <button onclick="toggleSidebar()" class="md:hidden mr-3 text-xl text-gray-400">☰</button>
-            Chat Académico
+    <header class="border-b border-gray-800 p-4 bg-gray-950 flex items-center justify-between shadow-md">
+        <div class="flex items-center gap-3">
+            <button onclick="toggleSidebar()" class="md:hidden p-2 bg-gray-800 rounded-lg text-gray-400">☰</button>
+            <div>
+                <h1 class="font-bold text-gray-100" id="headerMateria">Asistente Virtual</h1>
+                <p id="subHeader" class="text-xs text-gray-500">Selecciona una materia para comenzar</p>
+            </div>
         </div>
-        <span id="statusIndicator" class="text-xs text-green-500 font-normal">● En línea</span>
+        <div class="flex items-center gap-2">
+            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <span class="text-xs text-gray-400 font-medium">IA Activa</span>
+        </div>
     </header>
 
-    <div id="chatBox" class="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-900">
-        <div class="text-gray-500 text-center mt-10">
-            <p class="text-xl">👋 ¡Hola!</p>
-            <p>Selecciona una materia a la izquierda y escribe tu consulta.</p>
+    <div id="chatBox" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 bg-gray-900">
+        <div class="max-w-2xl mx-auto text-center mt-20 space-y-4">
+            <div class="bg-gray-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-3xl">🤖</div>
+            <h3 class="text-2xl font-bold text-gray-200">¡Bienvenido al Aula Virtual!</h3>
+            <p class="text-gray-400">Selecciona tu materia en el menú lateral, ingresa el código de acceso del docente y resuelve tus dudas con la IA basada en el material oficial.</p>
         </div>
     </div>
 
-    <div class="border-t border-gray-800 p-4 bg-gray-950 space-y-3">
-        
-        <input type="password"
-            id="codigoAcceso"
-            placeholder="Código de acceso de la clase"
-            class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:outline-none focus:border-green-500 transition">
+    <div class="p-4 bg-gray-950 border-t border-gray-800 shadow-2xl">
+        <div class="max-w-4xl mx-auto space-y-3">
+            
+            <div class="flex flex-col md:flex-row gap-3">
+                <input type="password"
+                    id="codigoAcceso"
+                    placeholder="Contraseña de la materia"
+                    class="w-full md:w-1/3 bg-gray-800 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition text-sm">
 
-        <div class="flex gap-3">
-            <input type="text"
-                id="preguntaAlumno"
-                onkeypress="if(event.key === 'Enter') preguntarIA()"
-                placeholder="Escribe tu pregunta aquí..."
-                class="flex-1 bg-gray-800 border border-gray-700 rounded-lg p-3 focus:outline-none focus:border-green-500 transition">
+                <div class="flex-1 flex gap-2">
+                    <input type="text"
+                        id="preguntaAlumno"
+                        onkeypress="if(event.key === 'Enter') preguntarIA()"
+                        placeholder="Escribe tu duda sobre el material..."
+                        class="flex-1 bg-gray-800 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none transition">
 
-            <button onclick="preguntarIA()"
-                id="btnEnviar"
-                class="bg-green-600 hover:bg-green-700 px-6 rounded-lg font-bold transition disabled:opacity-50">
-                Enviar
-            </button>
+                    <button onclick="preguntarIA()"
+                        id="btnEnviar"
+                        class="bg-green-600 hover:bg-green-700 px-6 rounded-xl font-bold transition-all transform active:scale-95 disabled:opacity-50">
+                        Preguntar
+                    </button>
+                </div>
+            </div>
+            <p class="text-[10px] text-gray-600 text-center uppercase tracking-widest font-bold">Respuesta basada en material docente verificado</p>
         </div>
     </div>
 
 </main>
 
 <script>
-/** * CONFIGURACIÓN CRUCIAL:
- * Si el frontend y backend están unificados, dejamos la URL vacía.
- * El navegador usará automáticamente la URL de Render/Vercel.
- */
-const API_URL = window.location.origin; 
+const API_URL = "https://asistente-docente.onrender.com"; // Asegúrate que esta sea tu URL de Render
 window.materiaSeleccionada = null;
 
 function toggleSidebar() {
@@ -105,40 +118,59 @@ function toggleSidebar() {
 }
 
 function nuevaConversacion() {
-    document.getElementById("chatBox").innerHTML =
-        `<div class="text-gray-500 text-center mt-10">Nueva conversación iniciada…</div>`;
+    document.getElementById("chatBox").innerHTML = `
+        <div class="text-gray-500 text-center mt-10 animate-fade-in">
+            <p>Se ha reiniciado el chat. El contexto de la materia sigue activo.</p>
+        </div>`;
 }
 
-function seleccionarMateria(id, element) {
+function seleccionarMateria(id, nombre, element) {
     window.materiaSeleccionada = id;
+    
+    // UI Updates
+    document.getElementById("headerMateria").textContent = nombre;
+    document.getElementById("subHeader").textContent = `Cátedra ID: ${id}`;
+    
     document.querySelectorAll("#sidebarMaterias div")
-        .forEach(i => i.classList.remove("bg-gray-800", "text-white", "border-l-4", "border-green-500"));
+        .forEach(i => i.classList.remove("bg-green-900/30", "text-green-400", "border-l-4", "border-green-500"));
 
-    element.classList.add("bg-gray-800", "text-white", "border-l-4", "border-green-500");
+    element.classList.add("bg-green-900/30", "text-green-400", "border-l-4", "border-green-500");
+    
+    if (window.innerWidth < 768) toggleSidebar();
 }
 
 async function cargarMaterias() {
     try {
-        const res = await fetch(`${API_URL}/api/materias`); // Ajustado a la ruta estándar /api
-        if (!res.ok) throw new Error("No se pudo obtener las materias");
+        const res = await fetch(`${API_URL}/api/materias`);
+        if (!res.ok) throw new Error("Error servidor");
         const materias = await res.json();
 
         const sidebar = document.getElementById("sidebarMaterias");
         sidebar.innerHTML = "";
 
+        if (materias.length === 0) {
+            sidebar.innerHTML = "<p class='text-gray-600 p-2'>No hay materias disponibles.</p>";
+            return;
+        }
+
         materias.forEach(m => {
             const div = document.createElement("div");
-            // Usamos 'm.id' o 'm.materiaId' según tu base de datos SQLite
-            const nombreMateria = m.id || m.materiaId || "Materia sin nombre";
-            div.textContent = nombreMateria;
-            div.className = "cursor-pointer p-3 rounded hover:bg-gray-800 transition duration-200 mb-1";
-            div.onclick = (e) => seleccionarMateria(nombreMateria, div);
+            // Usamos m.id (identificador) y m.nombre (nombre docente/materia)
+            const nombreMostrar = m.nombre || m.id;
+            
+            div.className = "cursor-pointer p-3 rounded-lg hover:bg-gray-800 transition duration-200 mb-1 text-sm font-medium border-l-4 border-transparent";
+            div.innerHTML = `
+                <div class="flex flex-col">
+                    <span>${nombreMostrar}</span>
+                    <span class="text-[10px] opacity-50 font-mono">${m.id}</span>
+                </div>
+            `;
+            div.onclick = () => seleccionarMateria(m.id, nombreMostrar, div);
             sidebar.appendChild(div);
         });
 
     } catch (err) {
-        console.error("Error cargando materias", err);
-        document.getElementById("sidebarMaterias").innerHTML = "<p class='text-red-500 px-2'>Error al conectar con el servidor.</p>";
+        document.getElementById("sidebarMaterias").innerHTML = "<p class='text-red-500 text-xs p-2'>Error al conectar con Render.</p>";
     }
 }
 
@@ -150,24 +182,24 @@ async function preguntarIA() {
     const chatBox = document.getElementById('chatBox');
     const btnEnviar = document.getElementById('btnEnviar');
 
-    if (!pregunta || !codigoAcceso || !materiaId) {
-        alert("Por favor: Selecciona una materia, ingresa el código y tu pregunta.");
-        return;
-    }
+    if (!materiaId) return alert("Primero selecciona una materia del menú lateral.");
+    if (!codigoAcceso) return alert("Ingresa el código de acceso de la clase.");
+    if (!pregunta) return;
 
-    // Bloquear UI mientras carga
+    // Bloquear UI
     btnEnviar.disabled = true;
-    inputPregunta.value = "Pensando...";
+    const originalPlaceholder = inputPregunta.placeholder;
+    inputPregunta.placeholder = "La IA está procesando el material...";
+    inputPregunta.value = "";
 
-    // Agregar pregunta del alumno al chat
+    // Mensaje Alumno
     chatBox.innerHTML += `
         <div class="flex justify-end animate-fade-in">
-            <div class="bg-green-700 p-4 rounded-2xl rounded-tr-none max-w-[80%] shadow-lg">
+            <div class="bg-blue-600 text-white p-4 rounded-2xl rounded-tr-none max-w-[85%] shadow-lg">
                 ${pregunta}
             </div>
         </div>
     `;
-    
     chatBox.scrollTop = chatBox.scrollHeight;
 
     try {
@@ -178,34 +210,35 @@ async function preguntarIA() {
         });
 
         const data = await res.json();
+        
         if (!res.ok) {
-            alert(data.respuesta || "Error en la consulta");
-            return;
+            chatBox.innerHTML += `
+                <div class="flex justify-start animate-fade-in">
+                    <div class="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-2xl rounded-tl-none max-w-[85%]">
+                        ⚠️ ${data.respuesta || "Error al consultar."}
+                    </div>
+                </div>`;
+        } else {
+            const respuestaHTML = marked.parse(data.respuesta);
+            chatBox.innerHTML += `
+                <div class="flex justify-start animate-fade-in">
+                    <div class="bg-gray-800 border border-gray-700 p-4 rounded-2xl rounded-tl-none max-w-[85%] shadow-xl prose prose-invert text-gray-200">
+                        ${respuestaHTML}
+                    </div>
+                </div>`;
         }
-        // Convertir Markdown a HTML
-        const respuestaHTML = marked.parse(data.respuesta || "Lo siento, no pude procesar esa respuesta.");
 
-        chatBox.innerHTML += `
-            <div class="flex justify-start animate-fade-in">
-                <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-none max-w-[80%] shadow-lg prose prose-invert">
-                    ${respuestaHTML}
-                </div>
-            </div>
-        `;
-
-        // Renderizar fórmulas matemáticas si las hay
         if (window.MathJax) MathJax.typesetPromise();
 
     } catch (err) {
-        chatBox.innerHTML += `<div class="text-red-400 text-center">❌ Error de conexión con el asistente.</div>`;
+        chatBox.innerHTML += `<div class="text-red-400 text-center text-xs">Error crítico de conexión. Revisa si el backend en Render está activo.</div>`;
     } finally {
         btnEnviar.disabled = false;
-        inputPregunta.value = "";
+        inputPregunta.placeholder = originalPlaceholder;
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 }
 
-// Iniciar carga
 cargarMaterias();
 </script>
 

@@ -3,83 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Docente</title>
+    <title>Panel Docente - Gestión de Material</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-6">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
 <div class="w-full max-w-4xl bg-white shadow-xl rounded-2xl p-8 space-y-6">
-    <h1 class="text-3xl font-bold text-blue-800">Panel Docente</h1>
-
-    <div class="space-y-4">
-        <input 
-            type="text" 
-            id="materiaId" 
-            placeholder="ID de la materia (ej: calculo-1)" 
-            class="w-full border p-3 rounded-lg"
-        >
-
-        <input 
-            type="password" 
-            id="codigoAcceso" 
-            placeholder="Código de acceso para alumnos" 
-            class="w-full border p-3 rounded-lg"
-        >
-
-        <input 
-            type="file" 
-            id="archivo" 
-            accept=".pdf" 
-            class="w-full border p-3 rounded-lg"
-        >
-
-        <textarea 
-            id="textoAdicional" 
-            placeholder="Información adicional (fechas, avisos, consignas...)" 
-            class="w-full border p-3 rounded-lg h-32"
-        ></textarea>
-
-        <button 
-            onclick="subirMaterial()" 
-            class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold"
-        >
-            Crear / Actualizar Materia
-        </button>
-
-        <p id="mensaje" class="text-sm text-green-600"></p>
+    <div class="border-b pb-4">
+        <h1 class="text-3xl font-bold text-blue-800">Panel Docente</h1>
+        <p class="text-gray-500">Carga el material de tu cátedra para el asistente de IA</p>
     </div>
 
-    <hr>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Nombre del Docente</label>
+            <input type="text" id="nombreDocente" placeholder="Ej: Dr. García" 
+                class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">ID de la Materia (Clave única)</label>
+            <input type="text" id="materiaId" placeholder="Ej: historia-universal-1" 
+                class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Código para Alumnos</label>
+            <input type="text" id="codigoAcceso" placeholder="Crea una contraseña para tu clase" 
+                class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Material PDF</label>
+            <input type="file" id="archivo" accept=".pdf" 
+                class="w-full border p-2.5 rounded-lg cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+        </div>
+    </div>
+
+    <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700">Contenido o Instrucciones adicionales</label>
+        <textarea id="textoAdicional" placeholder="Puedes escribir aquí avisos, consignas o contenido extra que la IA deba conocer..." 
+            class="w-full border p-3 rounded-lg h-28 focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+    </div>
+
+    <button onclick="subirMaterial()" 
+        class="w-full bg-blue-600 text-white py-4 rounded-lg hover:bg-blue-700 font-bold transition-all shadow-lg active:scale-[0.98]">
+        🚀 Crear / Actualizar Materia
+    </button>
+
+    <div id="statusContainer" class="hidden p-4 rounded-lg text-sm font-medium"></div>
+
+    <hr class="my-6">
 
     <div>
-        <h2 class="text-xl font-semibold mb-3">Materias creadas</h2>
-        <div id="listaMaterias" class="space-y-2 text-gray-700"></div>
+        <h2 class="text-xl font-semibold mb-4 text-gray-800 flex items-center">
+            <span class="mr-2">📚</span> Mis Materias en Supabase
+        </h2>
+        <div id="listaMaterias" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-gray-700">
+            </div>
     </div>
 </div>
 
 <script>
+// Asegúrate de que esta URL sea la de tu backend en Render
 const API_URL = "https://asistente-docente.onrender.com";
 
-async function subirMaterial() {
-    const materiaId = document.getElementById('materiaId').value;
-    const codigoAcceso = document.getElementById('codigoAcceso').value;
-    const texto = document.getElementById('textoAdicional').value;
-    const fileInput = document.getElementById('archivo');
-    const mensaje = document.getElementById('mensaje');
+function mostrarMensaje(texto, esError = false) {
+    const container = document.getElementById('statusContainer');
+    container.innerText = texto;
+    container.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
+    container.classList.add(esError ? 'bg-red-100' : 'bg-green-100');
+    container.classList.add(esError ? 'text-red-700' : 'text-green-700');
+}
 
-    if (!materiaId || !codigoAcceso) {
-        alert("Debes completar materia y código de acceso.");
+async function subirMaterial() {
+    const materiaId = document.getElementById('materiaId').value.trim();
+    const nombreDocente = document.getElementById('nombreDocente').value.trim();
+    const codigoAcceso = document.getElementById('codigoAcceso').value.trim();
+    const texto = document.getElementById('textoAdicional').value.trim();
+    const fileInput = document.getElementById('archivo');
+
+    if (!materiaId || !codigoAcceso || !nombreDocente) {
+        alert("Por favor, completa el nombre, ID de materia y código de acceso.");
         return;
     }
 
     const formData = new FormData();
     formData.append("materiaId", materiaId);
+    formData.append("nombreDocente", nombreDocente);
     formData.append("codigoAcceso", codigoAcceso);
     formData.append("textoAdicional", texto);
-    if (fileInput.files[0]) formData.append("archivo", fileInput.files[0]);
+    
+    if (fileInput.files[0]) {
+        formData.append("archivo", fileInput.files[0]);
+    }
 
-    mensaje.innerText = "Guardando materia...";
+    mostrarMensaje("⏳ Procesando PDF y subiendo a Supabase...");
 
     try {
         const res = await fetch(`${API_URL}/api/docente/subir-material`, {
@@ -88,16 +108,24 @@ async function subirMaterial() {
         });
 
         const data = await res.json();
-        mensaje.innerText = data.mensaje || data.error;
-        cargarMaterias();
+        
+        if (res.ok) {
+            mostrarMensaje("✅ " + data.mensaje);
+            // Limpiar archivo para evitar subidas accidentales
+            fileInput.value = "";
+            cargarMaterias();
+        } else {
+            mostrarMensaje("❌ " + (data.error || "Error en el servidor"), true);
+        }
 
     } catch (err) {
-        mensaje.innerText = "Error al conectar con el servidor.";
+        mostrarMensaje("❌ Error de conexión con el backend en Render.", true);
     }
 }
 
 async function cargarMaterias() {
     const lista = document.getElementById('listaMaterias');
+    lista.innerHTML = "<p class='text-gray-400 italic'>Actualizando lista...</p>";
 
     try {
         const res = await fetch(`${API_URL}/api/materias`);
@@ -105,19 +133,30 @@ async function cargarMaterias() {
 
         lista.innerHTML = "";
 
+        if (materias.length === 0) {
+            lista.innerHTML = "<p class='text-gray-500'>No hay materias registradas aún.</p>";
+            return;
+        }
+
         materias.forEach(m => {
+            // Usamos m.id y m.nombre que es como vienen de Supabase
             lista.innerHTML += `
-                <div class="p-3 border rounded-lg bg-gray-50">
-                    <strong>${m.materiaId}</strong>
+                <div class="p-4 border border-gray-200 rounded-xl bg-gray-50 flex justify-between items-center hover:shadow-md transition-shadow">
+                    <div>
+                        <p class="font-bold text-blue-900">${m.id}</p>
+                        <p class="text-xs text-gray-500 uppercase tracking-wider">Prof: ${m.nombre || 'N/A'}</p>
+                    </div>
+                    ${m.archivo_url ? `<a href="${m.archivo_url}" target="_blank" class="text-blue-500 hover:text-blue-700 text-sm font-medium">Ver PDF</a>` : ''}
                 </div>
             `;
         });
 
     } catch (err) {
-        lista.innerHTML = "No se pudieron cargar las materias.";
+        lista.innerHTML = "<p class='text-red-500'>Error al cargar las materias.</p>";
     }
 }
 
+// Cargar al iniciar
 cargarMaterias();
 </script>
 
