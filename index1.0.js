@@ -17,7 +17,6 @@ const pdf = require('pdf-parse');
 const app = express();
 
 // --- CONFIGURACIÓN SUPABASE ---
-// Asegúrate de tener estas variables en el .env de Render
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // --- LIMITADOR ---
@@ -36,8 +35,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- CONFIGURACIÓN DE IA ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+// CORRECCIÓN: Usando nombre de modelo válido y estable
 const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.5-flash",
+    model: "gemini-2.5-flash", 
     systemInstruction: `Eres un Asistente Académico Virtual diseñado para apoyar a los estudiantes cuando el docente no está disponible. Tu objetivo principal es facilitar el aprendizaje de forma amable, paciente y profesional.
 
 Sigue estrictamente este protocolo de respuesta:
@@ -47,13 +47,13 @@ Sigue estrictamente este protocolo de respuesta:
    - Explicaciones paso a paso.
    - Analogías sencillas.
    - Preguntas socráticas para guiar al alumno a la solución.
-4. TONO Y ESTILO: Mantén siempre un tono cortés, motivador y cercano ("¡Excelente pregunta!", "Vamos a resolverlo juntos"). Si el alumno parece frustrado, ofrece una estrategia de enseñanza alternativa o un enfoque más simple hasta asegurar que el concepto sea aprendido.
-5. RESTRICCIONES: Si el alumno hace preguntas fuera del ámbito académico o de la materia seleccionada, redirígelo amablemente a los temas de la clase.`
+4. TONO Y ESTILO: Mantén siempre un tono cortés, motivador y cercano. Si el alumno parece frustrado, ofrece una estrategia de enseñanza alternativa.
+5. RESTRICCIONES: Si el alumno hace preguntas fuera del ámbito académico, redirígelo amablemente a los temas de la clase.`
 });
 
 // --- RUTAS API ---
 
-// 1. Obtener todas las materias (Desde Supabase)
+// 1. Obtener todas las materias
 app.get("/api/materias", async (req, res) => {
     try {
         const { data, error } = await supabase
@@ -63,31 +63,36 @@ app.get("/api/materias", async (req, res) => {
         if (error) throw error;
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: "Error al obtener materias de Supabase." });
+        res.status(500).json({ error: "Error al obtener materias." });
     }
 });
 
-// 2. Subir material (Docente)
+// 2. Subir material (Docente) - CORREGIDO PARA NO BORRAR ANTERIOR
 app.post("/api/docente/subir-material", async (req, res) => {
     const { materiaId, codigoAcceso, nombreDocente, textoAdicional } = req.body;
     
     if (!materiaId) return res.status(400).json({ error: "Falta ID de materia." });
 
     try {
-        let contenidoExtraido = textoAdicional || "";
+        // A. BUSCAR CONTENIDO PREVIO PARA NO BORRARLO
+        const { data: materiaExistente } = await supabase
+            .from('docentes')
+            .select('contenido')
+            .eq('id', materiaId)
+            .single();
+
+        let contenidoAcumulado = materiaExistente?.contenido || "";
+        let nuevoContenidoExtraido = textoAdicional || "";
         let urlPublica = null;
 
-        // Procesar PDF si existe
+        // B. Procesar PDF si existe
         if (req.files && req.files.archivo) {
             const archivo = req.files.archivo;
-            
-            // Extraer texto para la IA
             const dataPdf = await pdf(archivo.data);
-            contenidoExtraido += `\n${dataPdf.text}`;
+            nuevoContenidoExtraido += `\n${dataPdf.text}`;
 
-            // Subir archivo a Supabase Storage
             const nombreArchivo = `${Date.now()}_${archivo.name.replace(/\s+/g, '_')}`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
+            const { error: uploadError } = await supabase.storage
                 .from('recursos-docentes')
                 .upload(`archivos/${nombreArchivo}`, archivo.data, {
                     contentType: 'application/pdf',
@@ -96,7 +101,6 @@ app.post("/api/docente/subir-material", async (req, res) => {
 
             if (uploadError) throw uploadError;
 
-            // Obtener URL Pública
             const { data: publicUrlData } = supabase.storage
                 .from('recursos-docentes')
                 .getPublicUrl(`archivos/${nombreArchivo}`);
@@ -104,38 +108,35 @@ app.post("/api/docente/subir-material", async (req, res) => {
             urlPublica = publicUrlData.publicUrl;
         }
 
-        const contenidoLimpio = contenidoExtraido.replace(/\s+/g, ' ').trim();
+        // C. CONCATENAR: Viejo + Nuevo
+        const contenidoFinal = (contenidoAcumulado + " " + nuevoContenidoExtraido).replace(/\s+/g, ' ').trim();
 
-        // GUARDAR EN TABLA "docentes" DE SUPABASE
+        // D. Guardar (Upsert)
         const { error: dbError } = await supabase
             .from('docentes')
             .upsert({ 
-                id: materiaId, // Asegúrate que en Supabase 'id' sea TEXT si usas nombres, o genera un UUID
+                id: materiaId,
                 nombre: nombreDocente || materiaId,
-                contenido: contenidoLimpio,
+                contenido: contenidoFinal,
                 codigo: codigoAcceso,
-                archivo_url: urlPublica
+                archivo_url: urlPublica // Actualiza a la última URL del archivo subido
             });
 
         if (dbError) throw dbError;
 
-        res.json({ 
-            mensaje: `Material guardado correctamente`, 
-            url: urlPublica 
-        });
+        res.json({ mensaje: "Material añadido exitosamente al acumulado." });
 
     } catch (error) {
-        console.error("Error detallado:", error);
-        res.status(500).json({ error: "Error al procesar y guardar el material." });
+        console.error("Error:", error);
+        res.status(500).json({ error: "Error al procesar material." });
     }
 });
 
-// 3. Preguntar a la IA (Alumno)
+// 3. Preguntar a la IA (Alumno) - CORREGIDO
 app.post("/api/alumno/preguntar", limitador, async (req, res) => {
     const { pregunta, materiaId, codigoAcceso } = req.body;
 
     try {
-        // Buscar materia en Supabase
         const { data: materia, error } = await supabase
             .from('docentes')
             .select('*')
@@ -144,30 +145,33 @@ app.post("/api/alumno/preguntar", limitador, async (req, res) => {
         
         if (error || !materia) return res.status(404).json({ respuesta: "Materia no encontrada." });
         
-        // Verificar código de acceso
         if (codigoAcceso !== materia.codigo) {
             return res.status(403).json({ respuesta: "⚠️ Código incorrecto para esta materia." });
         }
 
         const contexto = materia.contenido;
-        const hoy = new Date().toLocaleDateString('es-ES');
         
-        // Prompt optimizado
+        // PROMPT ESTRUCTURADO
         const promptFinal = `
-            FECHA ACTUAL: ${hoy}
-            CONTEXTO DEL DOCENTE: ${contexto}
-            
-            PREGUNTA DEL ESTUDIANTE: ${pregunta}
-            
-            INSTRUCCIÓN: Responde de forma clara usando el contexto arriba. Si no sabes la respuesta, sugiere contactar al docente.
+            CONTEXTO DEL MATERIAL DOCENTE:
+            """
+            ${contexto}
+            """
+
+            PREGUNTA DEL ESTUDIANTE: 
+            "${pregunta}"
+
+            INSTRUCCIÓN ADICIONAL: Responde en español, usando Markdown para el formato.
         `;
         
         const result = await model.generateContent(promptFinal);
-        res.json({ respuesta: result.response.text() });
+        const responseText = await result.response.text();
+        
+        res.json({ respuesta: responseText });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Error en la consulta de IA." });
+        console.error("Error IA:", error);
+        res.status(500).json({ respuesta: "Error al procesar tu duda en la IA." });
     }
 });
 
@@ -180,20 +184,18 @@ app.delete("/api/docente/borrar-materia/:id", async (req, res) => {
             .eq('id', req.params.id);
 
         if (error) throw error;
-        res.json({ mensaje: "Materia eliminada de Supabase." });
+        res.json({ mensaje: "Materia eliminada." });
     } catch (error) {
         res.status(500).json({ error: "No se pudo eliminar." });
     }
 });
 
-// Manejo de Frontend (SPA)
-app.use((req, res) => {
-    if (!req.url.startsWith('/api')) {
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    }
+// Manejo de Frontend
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+    console.log(`🚀 Servidor activo en puerto ${PORT}`);
 });
