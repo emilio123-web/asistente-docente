@@ -5,158 +5,209 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Docente - Gestión de Material</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loader { border-top-color: #3498db; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
 
-<div class="w-full max-w-4xl bg-white shadow-xl rounded-2xl p-8 space-y-6">
-    <div class="border-b pb-4">
-        <h1 class="text-3xl font-bold text-blue-800">Panel Docente</h1>
-        <p class="text-gray-500">Carga el material de tu cátedra para el asistente de IA</p>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Nombre del Docente</label>
-            <input type="text" id="nombreDocente" placeholder="Ej: Dr. García" 
-                class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+<div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+    
+    <div class="lg:col-span-2 bg-white shadow-xl rounded-2xl p-6 space-y-6">
+        <div class="border-b pb-4">
+            <h1 class="text-3xl font-bold text-blue-800">Panel Docente</h1>
+            <p class="text-gray-500">Carga y gestiona los PDFs de tu cátedra</p>
         </div>
 
-        <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">ID de la Materia (Clave única)</label>
-            <input type="text" id="materiaId" placeholder="Ej: historia-universal-1" 
-                class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        </div>
-
-        <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Código para Alumnos</label>
-            <input type="text" id="codigoAcceso" placeholder="Crea una contraseña para tu clase" 
-                class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-        </div>
-
-        <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Material PDF</label>
-            <input type="file" id="archivo" accept=".pdf" 
-                class="w-full border p-2.5 rounded-lg cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-        </div>
-    </div>
-
-    <div class="space-y-2">
-        <label class="block text-sm font-medium text-gray-700">Contenido o Instrucciones adicionales</label>
-        <textarea id="textoAdicional" placeholder="Puedes escribir aquí avisos, consignas o contenido extra que la IA deba conocer..." 
-            class="w-full border p-3 rounded-lg h-28 focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
-    </div>
-
-    <button onclick="subirMaterial()" 
-        class="w-full bg-blue-600 text-white py-4 rounded-lg hover:bg-blue-700 font-bold transition-all shadow-lg active:scale-[0.98]">
-        🚀 Crear / Actualizar Materia
-    </button>
-
-    <div id="statusContainer" class="hidden p-4 rounded-lg text-sm font-medium"></div>
-
-    <hr class="my-6">
-
-    <div>
-        <h2 class="text-xl font-semibold mb-4 text-gray-800 flex items-center">
-            <span class="mr-2">📚</span> Mis Materias en Supabase
-        </h2>
-        <div id="listaMaterias" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-gray-700">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-2">
+                <label class="block text-sm font-bold text-gray-700">Nombre del Docente</label>
+                <input type="text" id="nombreDocente" placeholder="Ej: Dr. García" 
+                    class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
             </div>
+
+            <div class="space-y-2">
+                <label class="block text-sm font-bold text-gray-700">ID de la Materia (Fijo)</label>
+                <input type="text" id="materiaId" placeholder="Ej: historia-1" 
+                    class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-sm font-bold text-gray-700">Código de Acceso (Alumnos)</label>
+                <input type="password" id="codigoAcceso" placeholder="Contraseña de la clase" 
+                    class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-sm font-bold text-gray-700">Subir nuevo PDF</label>
+                <input type="file" id="archivo" accept=".pdf" 
+                    class="w-full border p-2.5 rounded-lg cursor-pointer file:bg-blue-50 file:text-blue-700 file:border-0 file:rounded-full file:px-4">
+            </div>
+        </div>
+
+        <button onclick="subirMaterial()" 
+            class="w-full bg-blue-600 text-white py-4 rounded-lg hover:bg-blue-700 font-bold transition-all shadow-lg active:scale-95">
+            🚀 Subir y Acumular Material
+        </button>
+
+        <div id="statusContainer" class="hidden p-4 rounded-lg text-sm font-medium animate-pulse"></div>
+        
+        <div id="gestionArchivos" class="hidden border-t pt-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Archivos Cargados en esta Materia</h3>
+            <div id="listaRecursos" class="space-y-2">
+                </div>
+        </div>
+    </div>
+
+    <div class="bg-white shadow-xl rounded-2xl p-6">
+        <h2 class="text-xl font-bold mb-4 text-gray-800 flex items-center">
+            <span class="mr-2">📚</span> Mis Cátedras
+        </h2>
+        <div id="listaMaterias" class="space-y-3">
+            <p class="text-gray-400 italic text-sm text-center">Cargando...</p>
+        </div>
     </div>
 </div>
 
 <script>
-// Asegúrate de que esta URL sea la de tu backend en Render
 const API_URL = "https://asistente-docente.onrender.com";
 
 function mostrarMensaje(texto, esError = false) {
     const container = document.getElementById('statusContainer');
     container.innerText = texto;
-    container.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
-    container.classList.add(esError ? 'bg-red-100' : 'bg-green-100');
-    container.classList.add(esError ? 'text-red-700' : 'text-green-700');
+    container.className = `p-4 rounded-lg text-sm font-medium ${esError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
 }
 
 async function subirMaterial() {
     const materiaId = document.getElementById('materiaId').value.trim();
     const nombreDocente = document.getElementById('nombreDocente').value.trim();
     const codigoAcceso = document.getElementById('codigoAcceso').value.trim();
-    const texto = document.getElementById('textoAdicional').value.trim();
     const fileInput = document.getElementById('archivo');
 
-    if (!materiaId || !codigoAcceso || !nombreDocente) {
-        alert("Por favor, completa el nombre, ID de materia y código de acceso.");
-        return;
-    }
+    if (!materiaId || !codigoAcceso) return alert("Faltan datos obligatorios.");
 
     const formData = new FormData();
     formData.append("materiaId", materiaId);
     formData.append("nombreDocente", nombreDocente);
     formData.append("codigoAcceso", codigoAcceso);
-    formData.append("textoAdicional", texto);
-    
-    if (fileInput.files[0]) {
-        formData.append("archivo", fileInput.files[0]);
-    }
+    if (fileInput.files[0]) formData.append("archivo", fileInput.files[0]);
 
-    mostrarMensaje("⏳ Procesando PDF y subiendo a Supabase...");
+    mostrarMensaje("⏳ Procesando... Por favor espera.");
 
     try {
         const res = await fetch(`${API_URL}/api/docente/subir-material`, {
             method: 'POST',
             body: formData
         });
-
         const data = await res.json();
         
         if (res.ok) {
-            mostrarMensaje("✅ " + data.mensaje);
-            // Limpiar archivo para evitar subidas accidentales
+            mostrarMensaje("✅ Material añadido con éxito.");
             fileInput.value = "";
             cargarMaterias();
+            cargarDetalleArchivos(materiaId); // Refrescar lista de borrado
         } else {
-            mostrarMensaje("❌ " + (data.error || "Error en el servidor"), true);
+            mostrarMensaje("❌ " + data.error, true);
         }
-
     } catch (err) {
-        mostrarMensaje("❌ Error de conexión con el backend en Render.", true);
+        mostrarMensaje("❌ Error de conexión.", true);
     }
 }
 
 async function cargarMaterias() {
     const lista = document.getElementById('listaMaterias');
-    lista.innerHTML = "<p class='text-gray-400 italic'>Actualizando lista...</p>";
+    try {
+        const res = await fetch(`${API_URL}/api/materias`);
+        const materias = await res.json();
+        lista.innerHTML = "";
+
+        materias.forEach(m => {
+            lista.innerHTML += `
+                <div onclick="seleccionarMateria('${m.id}', '${m.nombre}')" 
+                     class="p-3 border rounded-xl bg-gray-50 cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+                    <p class="font-bold text-blue-900 text-sm">${m.id}</p>
+                    <p class="text-[10px] text-gray-500 uppercase tracking-widest">${m.nombre}</p>
+                </div>`;
+        });
+    } catch (err) {
+        lista.innerHTML = "Error al cargar.";
+    }
+}
+
+function seleccionarMateria(id, nombre) {
+    document.getElementById('materiaId').value = id;
+    document.getElementById('nombreDocente').value = nombre;
+    document.getElementById('gestionArchivos').classList.remove('hidden');
+    cargarDetalleArchivos(id);
+}
+
+async function cargarDetalleArchivos(id) {
+    const contenedor = document.getElementById('listaRecursos');
+    contenedor.innerHTML = "<p class='text-xs text-blue-500'>Obteniendo archivos...</p>";
 
     try {
         const res = await fetch(`${API_URL}/api/materias`);
         const materias = await res.json();
+        const m = materias.find(item => item.id === id);
 
-        lista.innerHTML = "";
-
-        if (materias.length === 0) {
-            lista.innerHTML = "<p class='text-gray-500'>No hay materias registradas aún.</p>";
+        if (!m || !m.archivo_url) {
+            contenedor.innerHTML = "<p class='text-xs text-gray-400'>No hay archivos en esta materia.</p>";
             return;
         }
 
-        materias.forEach(m => {
-            // Usamos m.id y m.nombre que es como vienen de Supabase
-            lista.innerHTML += `
-                <div class="p-4 border border-gray-200 rounded-xl bg-gray-50 flex justify-between items-center hover:shadow-md transition-shadow">
-                    <div>
-                        <p class="font-bold text-blue-900">${m.id}</p>
-                        <p class="text-xs text-gray-500 uppercase tracking-wider">Prof: ${m.nombre || 'N/A'}</p>
-                    </div>
-                    ${m.archivo_url ? `<a href="${m.archivo_url}" target="_blank" class="text-blue-500 hover:text-blue-700 text-sm font-medium">Ver PDF</a>` : ''}
-                </div>
-            `;
-        });
+        const urls = m.archivo_url.split('\n').filter(u => u.trim() !== "");
+        contenedor.innerHTML = "";
 
+        urls.forEach((url, index) => {
+            const nombreArchivo = url.split('/').pop().split('_').slice(1).join('_'); // Quitar timestamp
+            contenedor.innerHTML += `
+                <div class="flex items-center justify-between bg-white border p-3 rounded-lg shadow-sm">
+                    <div class="flex items-center space-x-2 overflow-hidden">
+                        <span class="text-red-500 text-lg">📄</span>
+                        <a href="${url}" target="_blank" class="text-sm font-medium text-gray-700 hover:text-blue-600 truncate">
+                            ${nombreArchivo || 'Documento ' + (index + 1)}
+                        </a>
+                    </div>
+                    <button onclick="borrarArchivo('${url}')" 
+                        class="ml-2 bg-red-50 text-red-600 p-2 rounded-md hover:bg-red-600 hover:text-white transition-colors text-xs font-bold">
+                        Eliminar
+                    </button>
+                </div>`;
+        });
     } catch (err) {
-        lista.innerHTML = "<p class='text-red-500'>Error al cargar las materias.</p>";
+        contenedor.innerHTML = "Error al cargar recursos.";
     }
 }
 
-// Cargar al iniciar
+async function borrarArchivo(url) {
+    const materiaId = document.getElementById('materiaId').value;
+    const codigoAcceso = document.getElementById('codigoAcceso').value;
+
+    if (!codigoAcceso) return alert("Ingresa el código de acceso para confirmar el borrado.");
+    if (!confirm("¿Estás seguro de que deseas eliminar este PDF del servidor?")) return;
+
+    try {
+        const res = await fetch(`${API_URL}/api/docente/borrar-recurso`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ materiaId, urlABorrar: url, codigoAcceso })
+        });
+
+        if (res.ok) {
+            mostrarMensaje("🗑️ Archivo eliminado.");
+            cargarDetalleArchivos(materiaId);
+        } else {
+            const d = await res.json();
+            alert("Error: " + d.error);
+        }
+    } catch (err) {
+        alert("Error de conexión.");
+    }
+}
+
+// Inicializar
 cargarMaterias();
 </script>
 

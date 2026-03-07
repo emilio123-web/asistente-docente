@@ -68,69 +68,146 @@ app.get("/api/materias", async (req, res) => {
 });
 
 // 2. Subir material (Docente) - CORREGIDO PARA NO BORRAR ANTERIOR
+// 2. Subir material (Docente) - CONFIGURADO PARA ACUMULACIÓN TOTAL
 app.post("/api/docente/subir-material", async (req, res) => {
     const { materiaId, codigoAcceso, nombreDocente, textoAdicional } = req.body;
     
     if (!materiaId) return res.status(400).json({ error: "Falta ID de materia." });
 
     try {
-        // A. BUSCAR CONTENIDO PREVIO PARA NO BORRARLO
+        // 1. OBTENER DATOS ACTUALES (Texto y URLs previas)
         const { data: materiaExistente } = await supabase
             .from('docentes')
-            .select('contenido')
+            .select('contenido, archivo_url')
             .eq('id', materiaId)
             .single();
 
         let contenidoAcumulado = materiaExistente?.contenido || "";
-        let nuevoContenidoExtraido = textoAdicional || "";
-        let urlPublica = null;
+        let listaUrlsAnteriores = materiaExistente?.archivo_url || ""; // Asumiendo que es un string o lista
+        let nuevoTextoExtraido = textoAdicional || "";
+        let urlDelNuevoArchivo = null;
 
-        // B. Procesar PDF si existe
+        // 2. PROCESAR EL NUEVO PDF
         if (req.files && req.files.archivo) {
             const archivo = req.files.archivo;
+            
+            // Extraer texto para la IA
             const dataPdf = await pdf(archivo.data);
-            nuevoContenidoExtraido += `\n${dataPdf.text}`;
+            nuevoTextoExtraido += `\n${dataPdf.text}`;
 
-            const nombreArchivo = `${Date.now()}_${archivo.name.replace(/\s+/g, '_')}`;
+            // CREAR NOMBRE ÚNICO (Evita que el PDF nuevo borre al viejo en Storage)
+            const timestamp = Date.now();
+            const nombreLimpio = archivo.name.replace(/\s+/g, '_');
+            const nombreFinalStorage = `archivos/${materiaId}/${timestamp}_${nombreLimpio}`;
+
             const { error: uploadError } = await supabase.storage
                 .from('recursos-docentes')
-                .upload(`archivos/${nombreArchivo}`, archivo.data, {
+                .upload(nombreFinalStorage, archivo.data, {
                     contentType: 'application/pdf',
-                    upsert: true
+                    upsert: false // No sobrescribir nunca
                 });
 
             if (uploadError) throw uploadError;
 
+            // Obtener la URL del nuevo archivo
             const { data: publicUrlData } = supabase.storage
                 .from('recursos-docentes')
-                .getPublicUrl(`archivos/${nombreArchivo}`);
+                .getPublicUrl(nombreFinalStorage);
             
-            urlPublica = publicUrlData.publicUrl;
+            urlDelNuevoArchivo = publicUrlData.publicUrl;
         }
 
-        // C. CONCATENAR: Viejo + Nuevo
-        const contenidoFinal = (contenidoAcumulado + " " + nuevoContenidoExtraido).replace(/\s+/g, ' ').trim();
+        // 3. CONCATENAR TEXTO Y ACTUALIZAR LISTA DE URLS
+        const contenidoFinal = (contenidoAcumulado + " " + nuevoTextoExtraido).replace(/\s+/g, ' ').trim();
+        
+        // Creamos una lista separada por comas o saltos de línea para las URLs
+        const todasLasUrls = listaUrlsAnteriores 
+            ? `${listaUrlsAnteriores}\n${urlDelNuevoArchivo}` 
+            : urlDelNuevoArchivo;
 
-        // D. Guardar (Upsert)
+        // 4. GUARDAR CAMBIOS (UPSERT)
         const { error: dbError } = await supabase
             .from('docentes')
             .upsert({ 
                 id: materiaId,
                 nombre: nombreDocente || materiaId,
-                contenido: contenidoFinal,
+                contenido: contenidoFinal, // Aquí se suma el texto de los 15 PDFs
                 codigo: codigoAcceso,
-                archivo_url: urlPublica // Actualiza a la última URL del archivo subido
+                archivo_url: todasLasUrls // Aquí se guardan todos los links
             });
 
         if (dbError) throw dbError;
 
-        res.json({ mensaje: "Material añadido exitosamente al acumulado." });
+        res.json({ 
+            mensaje: "Material sumado con éxito. El asistente ahora es más inteligente.",
+            urls: todasLasUrls 
+        });
 
     } catch (error) {
-        console.error("Error:", error);
-        res.status(500).json({ error: "Error al procesar material." });
+        console.error("Error al acumular material:", error);
+        res.status(500).json({ error: "Error al procesar y sumar el material." });
     }
 });
+
+
+// NUEVA RUTA: BORRAR UN RECURSO ESPECÍFICO
+// ============================================================
+app.post("/api/docente/borrar-recurso", async (req, res) => {
+    const { materiaId, urlABorrar, codigoAcceso } = req.body;
+
+    if (!materiaId || !urlABorrar) {
+        return res.status(400).json({ error: "Faltan datos para eliminar el archivo." });
+    }
+
+    try {
+        // 1. Verificar que la materia existe y el código es correcto
+        const { data: materia, error: searchError } = await supabase
+            .from('docentes')
+            .select('*')
+            .eq('id', materiaId)
+            .single();
+
+        if (searchError || !materia) return res.status(404).json({ error: "Materia no encontrada." });
+        if (codigoAcceso !== materia.codigo) return res.status(403).json({ error: "Código incorrecto." });
+
+        // 2. Limpiar la lista de URLs
+        // Convertimos el string de la DB en un array, quitamos la URL elegida y volvemos a unir
+        const urlsActuales = materia.archivo_url ? materia.archivo_url.split('\n') : [];
+        const urlsFiltradas = urlsActuales.filter(url => url.trim() !== urlABorrar.trim() && url.trim() !== "");
+        const nuevasUrlsString = urlsFiltradas.join('\n');
+
+        // 3. Borrar el archivo físico del Storage de Supabase
+        // Extraemos la ruta interna: "archivos/ID/nombre.pdf"
+        const parteRuta = urlABorrar.split('/storage/v1/object/public/recursos-docentes/')[1];
+        if (parteRuta) {
+            await supabase.storage
+                .from('recursos-docentes')
+                .remove([parteRuta]);
+        }
+
+        // 4. Actualizar la base de datos con la nueva lista de URLs
+        // IMPORTANTE: El texto en 'materia.contenido' seguirá ahí. 
+        // Para borrar el texto exacto necesitarías una base de datos más compleja,
+        // por ahora esto limpia la lista de archivos visuales.
+        const { error: updateError } = await supabase
+            .from('docentes')
+            .update({ archivo_url: nuevasUrlsString })
+            .eq('id', materiaId);
+
+        if (updateError) throw updateError;
+
+        res.json({ 
+            mensaje: "Archivo eliminado del registro.", 
+            urlsRestantes: nuevasUrlsString 
+        });
+
+    } catch (error) {
+        console.error("Error al borrar recurso:", error);
+        res.status(500).json({ error: "No se pudo eliminar el archivo." });
+    }
+});
+
+
 
 // 3. Preguntar a la IA (Alumno) - CORREGIDO
 app.post("/api/alumno/preguntar", limitador, async (req, res) => {
